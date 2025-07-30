@@ -784,14 +784,49 @@ function App() {
 
       for (const node of order) {
         if (node.type === "js" && node.code) {
+          // Intercept console.log, console.error, etc. for user code
+          const origConsole = {
+            log: console.log,
+            error: console.error,
+            warn: console.warn,
+            info: console.info
+          };
           try {
+            console.log = function (...args) {
+              appendLog(args.map(String).join(" "), "stdout");
+              if (origConsole.log) origConsole.log.apply(console, args);
+            };
+            console.error = function (...args) {
+              appendLog(args.map(String).join(" "), "stderr");
+              if (origConsole.error) origConsole.error.apply(console, args);
+            };
+            console.warn = function (...args) {
+              appendLog(args.map(String).join(" "), "notification");
+              if (origConsole.warn) origConsole.warn.apply(console, args);
+            };
+            console.info = function (...args) {
+              appendLog(args.map(String).join(" "), "notification");
+              if (origConsole.info) origConsole.info.apply(console, args);
+            };
+
             // eslint-disable-next-line no-new-func
             const fn = new Function("context", node.code);
             ctx = fn(ctx) || ctx;
             const msg = `Step ${step++}: Ran JS node "${node.label || node.id}"`;
             logs.push(msg);
             appendLog(msg, "stdout");
+
+            // Restore original console after execution
+            console.log = origConsole.log;
+            console.error = origConsole.error;
+            console.warn = origConsole.warn;
+            console.info = origConsole.info;
           } catch (err) {
+            // Restore original console in case of error
+            console.log = origConsole.log;
+            console.error = origConsole.error;
+            console.warn = origConsole.warn;
+            console.info = origConsole.info;
             const msg = `❌ Error in node "${node.label || node.id}": ${err.message}`;
             logs.push(msg);
             appendLog(msg, "stderr");
