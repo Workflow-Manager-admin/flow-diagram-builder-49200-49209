@@ -266,11 +266,21 @@ body, html {
   border-top: 1.4px solid var(--border);
   padding: .7em 2.1em;
   color: var(--text-main);
+  min-height: 52px;
+  transition: height 0.08s;
+  user-select: none;
+  position: relative;
 }
 .bottom-panel-header {
   font-size: 0.99em;
   font-weight: 500;
   color: var(--color-secondary);
+  padding-top: 0.2em;
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6em;
 }
 .bottom-panel-log {
   padding: 0.55em 1em;
@@ -282,15 +292,61 @@ body, html {
   font-size: 1.01em;
   font-family: 'Fira Mono', 'Consolas', monospace;
   overflow-x: auto;
-}
-.bottom-panel-log.error {
-  background: #1a0507;
-  color: #ffbdbd;
-  border: 1.3px solid #ff9797;
+  overflow-y: auto;
+  max-height: 350px;
+  border: 1.25px solid #22252b;
+  box-shadow: 0 0.5px 0.8px #14141422;
+  transition: box-shadow 0.15s, border 0.13s;
 }
 .bottom-panel-empty {
   color: #80808b;
   font-style: italic;
+}
+
+.bottom-panel-log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 0.08em 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.44;
+}
+.bottom-panel-log-line.error {
+  color: #ffbdbd !important;
+  background: #31101a22;
+  border-left: 2.4px solid #ff3939b0;
+  padding-left: 7px;
+  margin-bottom: 1px;
+}
+.bottom-panel-log-line.notification {
+  color: #fbc02d !important;
+}
+.bottom-panel-log-ts {
+  color: #c1cfaa;
+  opacity: 0.61;
+  font-size: 0.96em;
+  margin-right: 0.3em;
+  user-select: none;
+  font-family: inherit;
+}
+
+.bottom-panel .resize-handle {
+  height: 11px;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  bottom: 0;
+  cursor: ns-resize;
+  background: linear-gradient(180deg, rgba(200,200,200,0.00), #ebebeb34 95%);
+  z-index: 300;
+  user-select: none;
+}
+
+@media (max-width: 900px) {
+  .bottom-panel {
+    font-size: 0.95em;
+    padding: 0.7em 0.6em;
+  }
 }
 
 .notification-stack {

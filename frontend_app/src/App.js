@@ -203,13 +203,162 @@ function Sidebar({ selected, onChange, onDelete }) {
   );
 }
 
-function BottomPanel({ output, error }) {
+/**
+ * PUBLIC_INTERFACE
+ * BottomPanelLog displays a real-time, scrollable code execution log area at the bottom of the app.
+ * Props:
+ * - logs: array of {type: "stdout" | "stderr" | "notification", text: string, timestamp: Date|string}
+ *   Logs are visually separated – error logs colored.
+ * - onClear: function to clear the log (optional).
+ * - resizable: bool for allowing vertical resizing (default true)
+ */
+function BottomPanelLog({ logs, onClear, resizable = true }) {
+  const panelRef = useRef();
+  // Auto-scroll to bottom on new logs
+  useEffect(() => {
+    if (panelRef.current) {
+      panelRef.current.scrollTop = panelRef.current.scrollHeight;
+    }
+  }, [logs]);
+  // Panel min/max height logic
+  const [height, setHeight] = useState(150);
+  const dragging = useRef(false);
+  function startDrag(e) {
+    dragging.current = true;
+    document.body.style.userSelect = "none";
+  }
+  function stopDrag() {
+    dragging.current = false;
+    document.body.style.userSelect = "";
+  }
+  function doDrag(e) {
+    if (!dragging.current) return;
+    let newH = window.innerHeight - e.clientY - 18;
+    if (newH < 70) newH = 70;
+    if (newH > 420) newH = 420;
+    setHeight(newH);
+  }
+  useEffect(() => {
+    if (!resizable) return;
+    window.addEventListener("mousemove", doDrag);
+    window.addEventListener("mouseup", stopDrag);
+    return () => {
+      window.removeEventListener("mousemove", doDrag);
+      window.removeEventListener("mouseup", stopDrag);
+    };
+  }, []);
+  // Log render helper
+  function renderLog(log, idx) {
+    let cls = "bottom-panel-log-line";
+    if (log.type === "stderr") cls += " error";
+    if (log.type === "notification") cls += " notification";
+    return (
+      <div key={idx} className={cls}>
+        <span className="bottom-panel-log-ts">
+          {log.timestamp
+            ? "[" +
+              new Date(log.timestamp).toLocaleTimeString("en-US", {
+                hour12: false,
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              }) +
+              "] "
+            : ""}
+        </span>
+        <span
+          style={
+            log.type === "stderr"
+              ? { color: "#ffbdbd" }
+              : log.type === "notification"
+              ? { color: "#fbc02d" }
+              : {}
+          }
+        >
+          {log.text}
+        </span>
+      </div>
+    );
+  }
   return (
-    <div className="bottom-panel">
-      <div className="bottom-panel-header">Execution Output</div>
-      <pre className={`bottom-panel-log${error ? " error" : ""}`}>
-        {output ? output : <span className="bottom-panel-empty">No output</span>}
-      </pre>
+    <div
+      className="bottom-panel"
+      style={{
+        position: "relative",
+        padding: ".7em 2.1em",
+        background: "var(--bg-bottom)",
+        borderTop: "1.4px solid var(--border)",
+        minHeight: 50,
+        maxHeight: 420,
+        height: resizable ? height : undefined,
+        transition: "height 0.06s",
+        boxShadow: "0 -2px 9px var(--shadow)",
+        zIndex: 100,
+        overflow: "visible",
+      }}
+    >
+      <div className="bottom-panel-header" style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>
+          Code Execution Logs
+          <span style={{ fontWeight: 400, fontSize: "0.94em", marginLeft: 8, color: "#988" }}>
+            (stdout, stderr, notifications)
+          </span>
+        </span>
+        {onClear && (
+          <button
+            className="btn"
+            style={{ fontSize: 13, padding: "3px 16px", marginRight: 8 }}
+            onClick={onClear}
+            title="Clear log"
+          >
+            🧹 Clear
+          </button>
+        )}
+      </div>
+      <div
+        className="bottom-panel-log"
+        ref={panelRef}
+        style={{
+          overflowY: "auto",
+          background: "#252a31",
+          color: "#eaffd0",
+          borderRadius: 7,
+          minHeight: 56,
+          fontFamily: "Fira Mono, Consolas, monospace",
+          marginTop: 8,
+          padding: "6px 11px",
+          fontSize: "1.05em",
+          border: "1.1px solid #2c2c2c",
+          maxHeight: resizable ? height - 46 : undefined,
+        }}
+        tabIndex={0}
+        aria-label="Code execution log"
+      >
+        {logs.length === 0 ? (
+          <span className="bottom-panel-empty">Log output will appear here as you execute flows.</span>
+        ) : (
+          logs.map(renderLog)
+        )}
+      </div>
+      {/* Resize handle */}
+      {resizable && (
+        <div
+          className="resize-handle"
+          style={{
+            position: "absolute",
+            left: 0,
+            bottom: 0,
+            height: 10,
+            width: "100%",
+            cursor: "ns-resize",
+            background: "transparent",
+            userSelect: "none",
+            zIndex: 2,
+          }}
+          onMouseDown={startDrag}
+          title="Resize log panel"
+        ></div>
+      )}
     </div>
   );
 }
@@ -505,8 +654,24 @@ function App() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  // output/error still used for summary showing (optional)
   const [output, setOutput] = useState("");
   const [error, setError] = useState(false);
+
+  // New: Execution log state (array of log objects)
+  const [execLogs, setExecLogs] = useState([]);
+  // Helper to append new log line, keeping log scrollback within reasonable size
+  // logType: 'stdout', 'stderr', or 'notification'
+  const appendLog = useCallback((text, logType = "stdout") => {
+    setExecLogs((prev) => {
+      let logs = [...prev, { text, type: logType, timestamp: new Date() }];
+      // Limit to last 120 lines to keep UI snappy
+      if (logs.length > 120) logs = logs.slice(logs.length - 120);
+      return logs;
+    });
+  }, []);
+  // Provides clear log button
+  const clearLogs = useCallback(() => setExecLogs([]), []);
 
   const pushNotification = useNotifications();
 
@@ -570,14 +735,18 @@ function App() {
 
   // -------- EXECUTION ---------
   // Run the flow: simple topo sort and execute JS
-  // Note: for demo, runs JS nodes only, passes a context object through the flow; for production, add proper cycle detection/sandboxing.
+  // Note: logs (including errors) are pushed to the real-time bottom log panel.
   function handleExecute() {
     if (nodes.length === 0) {
+      appendLog("No nodes to execute. Add nodes to the diagram before running.", "stderr");
       pushNotification("No nodes to execute", "error");
+      setError(true);
+      setOutput("");
       return;
     }
     setError(false);
     setOutput("Executing...");
+    appendLog("================== Flow execution started ==================", "notification");
     try {
       // Build adjacency list, topo sort
       const adj = {};
@@ -609,6 +778,8 @@ function App() {
       // Execution context
       let ctx = {};
       let logs = [];
+      let outputSummary = "";
+      let errorHappened = false;
       let step = 1;
 
       for (const node of order) {
@@ -617,29 +788,45 @@ function App() {
             // eslint-disable-next-line no-new-func
             const fn = new Function("context", node.code);
             ctx = fn(ctx) || ctx;
-            logs.push(`Step ${step++}: Ran JS node "${node.label || node.id}"`);
+            const msg = `Step ${step++}: Ran JS node "${node.label || node.id}"`;
+            logs.push(msg);
+            appendLog(msg, "stdout");
           } catch (err) {
-            logs.push(
-              `❌ Error in node "${node.label || node.id}": ${err.message}`
-            );
+            const msg = `❌ Error in node "${node.label || node.id}": ${err.message}`;
+            logs.push(msg);
+            appendLog(msg, "stderr");
             setError(true);
-            setOutput(logs.join("\n"));
             pushNotification("Execution error", "error");
-            return;
+            setOutput(logs.join("\n"));
+            errorHappened = true;
+            break;
           }
         } else if (node.type === "input") {
-          logs.push(`Step ${step++}: Input node "${node.label || node.id}"`);
+          const msg = `Step ${step++}: Input node "${node.label || node.id}"`;
+          logs.push(msg);
+          appendLog(msg, "stdout");
         } else if (node.type === "output") {
-          logs.push(`Step ${step++}: Output node "${node.label || node.id}"`);
+          const msg = `Step ${step++}: Output node "${node.label || node.id}"`;
+          logs.push(msg);
+          appendLog(msg, "stdout");
         }
       }
-      logs.push("\n✅ Flow execution complete.");
-      setOutput(logs.join("\n"));
-      setError(false);
-      pushNotification("Execution complete", "success");
+      if (!errorHappened) {
+        const doneMsg = "✅ Flow execution complete.";
+        logs.push(doneMsg);
+        appendLog(doneMsg, "notification");
+        setOutput(logs.join("\n"));
+        setError(false);
+        pushNotification("Execution complete", "success");
+      } else {
+        // Already handled
+      }
+      appendLog("============================================================", "notification");
     } catch (err) {
+      const fatal = "Flow execution failed: " + err.message;
+      appendLog(fatal, "stderr");
       setError(true);
-      setOutput("Flow execution failed: " + err.message);
+      setOutput(fatal);
       pushNotification("Execution Error: " + err.message, "error");
     }
   }
@@ -715,7 +902,15 @@ function App() {
           />
         </ResizablePanel>
       </div>
-      <BottomPanel output={output} error={error} />
+      {/* Dedicated real-time log panel */}
+      <BottomPanelLog
+        logs={execLogs}
+        onClear={execLogs.length > 0 ? clearLogs : undefined}
+        resizable={true}
+      />
+      <div style={{ fontSize: "1em", color: "#989894", textAlign: "center", padding: "2px", fontStyle: "italic" }}>
+        To see real-time code execution logs (output, errors, status), watch the <b>bottom panel</b> of the application.
+      </div>
     </div>
   );
 }
