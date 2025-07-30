@@ -48,7 +48,10 @@ function useLightTheme() {
 }
 
 // -------- NOTIFICATION SYSTEM --------
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * NotificationProvider wraps app children and provides the pushNotification context.
+ */
 function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   // PUBLIC_INTERFACE
@@ -78,6 +81,9 @@ function NotificationProvider({ children }) {
     </NotificationContext.Provider>
   );
 }
+
+// Export NotificationProvider for use at the root (index.js)
+export { NotificationProvider };
 
 // --------- LAYOUT COMPONENTS ---------
 function TopBar({ onExecute, onSave, onLoad }) {
@@ -681,38 +687,36 @@ function App() {
   // Main vertical layout: top bar -> flex row (sidebar, workspace) -> bottom logs
 
   return (
-    <NotificationProvider>
-      <div className="app-root">
-        <TopBar onExecute={handleExecute} onSave={handleSave} onLoad={handleLoad} />
-        <div className="main-row">
-          <ResizablePanel initialWidth={240} minWidth={140}>
-            <Palette onAddNode={handleDropNode} />
-          </ResizablePanel>
-          <div className="workspace-root">
-            <DiagramCanvas
-              nodes={nodes}
-              edges={edges}
-              selectedId={selectedId}
-              onNodeSelect={handleNodeSelect}
-              onDropNode={handleDropNode}
-              onDragNode={handleDragNode}
-              onCreateEdge={handleCreateEdge}
-              onCanvasClick={handleCanvasClick}
-              onNodeDoubleClick={handleNodeDoubleClick}
-            />
-          </div>
-          <ResizablePanel initialWidth={300} minWidth={170}>
-            <div id="sidebar-scroll-anchor" />
-            <Sidebar
-              selected={selected}
-              onChange={handleNodeChange}
-              onDelete={handleNodeDelete}
-            />
-          </ResizablePanel>
+    <div className="app-root">
+      <TopBar onExecute={handleExecute} onSave={handleSave} onLoad={handleLoad} />
+      <div className="main-row">
+        <ResizablePanel initialWidth={240} minWidth={140}>
+          <Palette onAddNode={handleDropNode} />
+        </ResizablePanel>
+        <div className="workspace-root">
+          <DiagramCanvas
+            nodes={nodes}
+            edges={edges}
+            selectedId={selectedId}
+            onNodeSelect={handleNodeSelect}
+            onDropNode={handleDropNode}
+            onDragNode={handleDragNode}
+            onCreateEdge={handleCreateEdge}
+            onCanvasClick={handleCanvasClick}
+            onNodeDoubleClick={handleNodeDoubleClick}
+          />
         </div>
-        <BottomPanel output={output} error={error} />
+        <ResizablePanel initialWidth={300} minWidth={170}>
+          <div id="sidebar-scroll-anchor" />
+          <Sidebar
+            selected={selected}
+            onChange={handleNodeChange}
+            onDelete={handleNodeDelete}
+          />
+        </ResizablePanel>
       </div>
-    </NotificationProvider>
+      <BottomPanel output={output} error={error} />
+    </div>
   );
 }
 
